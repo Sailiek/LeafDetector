@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <title>Processing Stages</title>
+</head>
+<body>
+    <h1>Image Processing Stages</h1>
+
+    <div class="original-image">
+        <h3>Original Image</h3>
+        <img src="{{ url_for('uploaded_file', filename=filename) }}" alt="Original Image" width="300">
+    </div>
+
+    <form id="processing-form">
+        <!-- Noise Cleaning Stage -->
+        <div class="stage-container">
+            <div class="stage-inputs">
+                <h3>Stage 2: Noise Cleaning</h3>
+                <label for="noise_cleaning">Choose a filter:</label>
+                <select id="noise_cleaning" name="noise_cleaning">
+                    <option value="none">None</option>
+                    <option value="linear">Linear Filters</option>
+                    <option value="nonlinear">Non-Linear Filters</option>
+                </select>
+                
+                <!-- Linear filters options (initially hidden) -->
+                <div id="linear_filters" style="display: none;">
+                    <label for="linear_filter_type">Choose linear filter:</label>
+                    <select id="linear_filter_type" name="linear_filter_type">
+                        <option value="gaussian">Gaussian Filter</option>
+                        <option value="mean">Mean Filter</option>
+                        <option value="laplacian">Laplacian Filter</option>
+                        <option value="butterworth">Butterworth Filter</option>
+                    </select>
+                </div>
+
+                <!-- Non-linear filters options (initially hidden) -->
+                <div id="nonlinear_filters" style="display: none;">
+                    <label for="nonlinear_filter_type">Choose non-linear filter:</label>
+                    <select id="nonlinear_filter_type" name="nonlinear_filter_type">
+                        <option value="median">Median Filter</option>
+                        <option value="bilateral">Bilateral Filter</option>
+                        <option value="nlm">Non-Local Means Filter</option>
+                        <option value="adaptive_median">Adaptive Median Filter</option>
+                    </select>
+                </div>
+            </div>
+            <div class="stage-preview" id="noise-cleaning-preview">
+                <div class="preview-placeholder">Preview will appear here after processing</div>
+            </div>
+        </div>
+
+        <!-- Edge Detection Stage -->
+        <div class="stage-container">
+            <div class="stage-inputs">
+                <h3>Stage 3: Edge Detection</h3>
+                <label for="edge_detection">Choose an algorithm:</label>
+                <select id="edge_detection" name="edge_detection">
+                    <option value="canny">Canny</option>
+                    <option value="sobel">Sobel</option>
+                    <option value="prewitt">Prewitt</option>
+                    <option value="log">LoG</option>
+                </select>
+            </div>
+            <div class="stage-preview" id="edge-detection-preview">
+                <div class="preview-placeholder">Preview will appear here after processing</div>
+            </div>
+        </div>
+
+        <!-- Segmentation Stage -->
+        <div class="stage-container">
+            <div class="stage-inputs">
+                <h3>Stage 4: Segmentation</h3>
+                <label for="segmentation">Choose a segmentation method:</label>
+                <select id="segmentation" name="segmentation">
+                    <option value="thresholding">Thresholding</option>
+                    <option value="active-contours">Active Contours</option>
+                </select>
+            </div>
+            <div class="stage-preview" id="segmentation-preview">
+                <div class="preview-placeholder">Preview will appear here after processing</div>
+            </div>
+        </div>
+
+        <!-- Contour Refinement Stage -->
+        <div class="stage-container">
+            <div class="stage-inputs">
+                <h3>Stage 5: Contour Refinement</h3>
+                <label for="contour_refinement">Choose a refinement method:</label>
+                <select id="contour_refinement" name="contour_refinement">
+                    <option value="none">None</option>
+                    <option value="morphological">Morphological Operations</option>
+                    <option value="enhancement">Enhancement</option>
+                </select>
+            </div>
+            <div class="stage-preview" id="contour-refinement-preview">
+                <div class="preview-placeholder">Preview will appear here after processing</div>
+            </div>
+        </div>
+
+        <button type="submit">Finalize Processing</button>
+    </form>
+
+    <script>
+        // Function to update preview for a specific stage
+        function updatePreview(stageId, imageUrl) {
+            const previewDiv = document.getElementById(stageId + '-preview');
+            // Clear existing content
+            previewDiv.innerHTML = '';
+            // Create and add new image
+            const img = document.createElement('img');
+            img.src = imageUrl + '?t=' + new Date().getTime(); // Add timestamp to prevent caching
+            img.alt = 'Processed Image';
+            previewDiv.appendChild(img);
+        }
+
+        // Function to process a stage
+        function processStage(stageId) {
+            const formData = new FormData();
+            formData.append('stage', stageId);
+            formData.append(stageId, document.getElementById(stageId).value);
+            
+            fetch(window.location.href, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                updatePreview(stageId.replace('_', '-'), '/uploads/' + data.processed_image);
+            })
+            .catch(error => console.error('Error:', error));
+        }
+
+        // Add change event listeners to all select elements
+        document.getElementById('noise_cleaning').addEventListener('change', function() {
+            const linearFilters = document.getElementById('linear_filters');
+            const nonlinearFilters = document.getElementById('nonlinear_filters');
+            
+            // Hide both filter type divs initially
+            linearFilters.style.display = 'none';
+            nonlinearFilters.style.display = 'none';
+            
+            // Show appropriate filter type div based on selection
+            if (this.value === 'linear') {
+                linearFilters.style.display = 'block';
+            } else if (this.value === 'nonlinear') {
+                nonlinearFilters.style.display = 'block';
+            }
+            
+            processStage('noise_cleaning');
+        });
+
+        // Add listeners for sub-filter changes
+        document.getElementById('linear_filter_type').addEventListener('change', function() {
+            processStage('noise_cleaning');
+        });
+
+        document.getElementById('nonlinear_filter_type').addEventListener('change', function() {
+            processStage('noise_cleaning');
+        });
+
+        document.getElementById('edge_detection').addEventListener('change', function() {
+            processStage('edge_detection');
+        });
+
+        document.getElementById('segmentation').addEventListener('change', function() {
+            processStage('segmentation');
+        });
+
+        document.getElementById('contour_refinement').addEventListener('change', function() {
+            processStage('contour_refinement');
+        });
+
+        // Prevent form submission
+        document.getElementById('processing-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+        });
+    </script>
+</body>
+</html>
