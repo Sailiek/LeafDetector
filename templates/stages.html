@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Leaf Processing Stages</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap">
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
-    <title>Processing Stages</title>
 </head>
 <body>
     <h1>Image Processing Stages</h1>
@@ -99,6 +100,11 @@
             <div class="stage-preview" id="contour-refinement-preview">
                 <div class="preview-placeholder">Preview will appear here after processing</div>
             </div>
+            <div id="detection-results" style="display: none;">
+                <h4>Plant Detection Results:</h4>
+                <p>Plant Type: <span id="plant-type"></span></p>
+                <p>Confidence: <span id="confidence"></span></p>
+            </div>
         </div>
 
         <button type="submit">Finalize Processing</button>
@@ -130,6 +136,16 @@
             .then(response => response.json())
             .then(data => {
                 updatePreview(stageId.replace('_', '-'), '/uploads/' + data.processed_image);
+                
+                // Handle plant detection results
+                if (data.detection) {
+                    const detectionDiv = document.getElementById('detection-results');
+                    detectionDiv.style.display = 'block';
+                    document.getElementById('plant-type').textContent = data.detection.plant_type;
+                    document.getElementById('confidence').textContent = data.detection.confidence;
+                } else {
+                    document.getElementById('detection-results').style.display = 'none';
+                }
             })
             .catch(error => console.error('Error:', error));
         }

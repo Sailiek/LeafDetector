@@ -1,0 +1,20 @@
+acer_rubrum - red maple
+quercus_rubra - northern red oak
+fagus_grandifolia - american beech
+betula_alleghaniensis - yellow birch
+pinus_strobus - eastern white pine
+acer_saccharum - sugar maple
+cornus_florida - flowering dogwood
+cercis_canadensis - eastern redbud
+liriodendron_tulipifera - tulip tree
+fraxinus_americana - white ash
+juglans_nigra - black walnut
+ginkgo_biloba - ginkgo
+malus_baccata - siberian crabapple
+carya_ovata - shagbark hickory
+quercus_alba - white oak
+tsuga_canadensis - eastern hemlock
+salix_babylonica - weeping willow
+aesculus_glabra - ohio buckeye
+crataegus_laevigata - english hawthorn
+populus_deltoides - eastern cottonwood

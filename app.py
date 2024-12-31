@@ -4,8 +4,12 @@ import cv2
 import numpy as np
 from werkzeug.utils import secure_filename
 from leaf_processor import ImagePreprocessor, LinearNoiseReduction, NonLinearNoiseReduction, EdgeDetector, Segmentation, ContourRefinement
+from plant_detector import PlantDetector
 
 app = Flask(__name__)
+
+# Initialize plant detector
+plant_detector = PlantDetector(model_path='model/best.keras')
 
 # Configurations
 UPLOAD_FOLDER = './uploads'
@@ -137,6 +141,18 @@ def stages(filename):
         # Save the processed image
         stage_filename = f'processed_{current_stage}_{filename}'
         cv2.imwrite(os.path.join(app.config['UPLOAD_FOLDER'], stage_filename), processed_image)
+        
+        # If this is the final stage (contour_refinement), perform plant detection
+        if current_stage == 'contour_refinement' and method != 'none':
+            # Load the processed image for detection
+            detection_result = plant_detector.detect(processed_image)
+            return jsonify({
+                'processed_image': stage_filename,
+                'detection': {
+                    'plant_type': detection_result['class_name'],
+                    'confidence': f"{detection_result['confidence']:.2%}"
+                }
+            })
         
         return jsonify({'processed_image': stage_filename})
 

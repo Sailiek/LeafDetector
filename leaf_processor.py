@@ -172,6 +172,9 @@ class Segmentation:
     @staticmethod
     def otsu(image):
         """Perform Otsu's thresholding."""
+        # Convert to 8-bit unsigned integer if needed
+        if image.dtype != np.uint8:
+            image = cv2.normalize(image, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U)
         _, binary = cv2.threshold(image, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
         return binary
 
@@ -190,7 +193,7 @@ class Segmentation:
             alpha=alpha,
             beta=beta,
             gamma=gamma,
-            max_iterations=iterations
+            max_num_iter=iterations
         )
 
 class ContourRefinement:
