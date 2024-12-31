@@ -170,13 +170,35 @@ class EdgeDetector:
 
 class Segmentation:
     @staticmethod
-    def otsu(image):
-        """Perform Otsu's thresholding."""
-        # Convert to 8-bit unsigned integer if needed
+    def otsu(image, block_size=35, c=5):
+        """Perform enhanced Otsu's thresholding with preprocessing."""
+        # Ensure 8-bit image
         if image.dtype != np.uint8:
             image = cv2.normalize(image, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U)
-        _, binary = cv2.threshold(image, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-        return binary
+        
+        # Apply CLAHE for better contrast
+        clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8,8))
+        enhanced = clahe.apply(image)
+        
+        # Apply bilateral filter to preserve edges while reducing noise
+        denoised = cv2.bilateralFilter(enhanced, 9, 75, 75)
+        
+        # Apply adaptive thresholding instead of global Otsu
+        binary = cv2.adaptiveThreshold(
+            denoised,
+            255,
+            cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+            cv2.THRESH_BINARY_INV,
+            block_size,
+            c
+        )
+        
+        # Clean up using morphological operations
+        kernel = np.ones((3,3), np.uint8)
+        cleaned = cv2.morphologyEx(binary, cv2.MORPH_OPEN, kernel, iterations=1)
+        cleaned = cv2.morphologyEx(cleaned, cv2.MORPH_CLOSE, kernel, iterations=2)
+        
+        return cleaned
 
     @staticmethod
     def adaptive(image, block_size=11, C=2):
@@ -185,93 +207,179 @@ class Segmentation:
                                    cv2.THRESH_BINARY, block_size, C)
 
     @staticmethod
-    def active_contour(image, initial_contour, alpha=0.01, beta=0.1, gamma=0.001, iterations=100):
-        """Apply active contour (snake) segmentation."""
-        return segmentation.active_contour(
-            image,
+    def active_contour(image, initial_contour, alpha=0.01, beta=0.1, gamma=0.001, iterations=200):
+        """Apply improved active contour (snake) segmentation."""
+        # Enhanced preprocessing
+        # 1. CLAHE for better contrast
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+        enhanced = clahe.apply(image)
+        
+        # 2. Denoise while preserving edges
+        denoised = cv2.fastNlMeansDenoising(enhanced, None, 10, 7, 21)
+        
+        # 3. Apply bilateral filter to preserve edges
+        bilateral = cv2.bilateralFilter(denoised, 9, 75, 75)
+        
+        # 4. Create strong edge map
+        edges = cv2.Canny(bilateral, 30, 150)
+        gradient = cv2.Sobel(bilateral, cv2.CV_64F, 1, 1)
+        gradient = cv2.normalize(gradient, None, 0, 1, cv2.NORM_MINMAX)
+        
+        # Combine edge information
+        edge_force = (edges.astype(float) / 255.0) + gradient
+        edge_force = cv2.normalize(edge_force, None, 0, 1, cv2.NORM_MINMAX)
+        
+        # Normalize image for snake algorithm
+        img_normalized = bilateral.astype(float) / 255.0
+        
+        # Create external force field
+        external_force = cv2.GaussianBlur(edge_force, (5,5), 0)
+        
+        # Evolution
+        snake = segmentation.active_contour(
+            external_force,
             initial_contour,
-            alpha=alpha,
-            beta=beta,
-            gamma=gamma,
-            max_num_iter=iterations
+            alpha=alpha,    # Controls elasticity
+            beta=beta,      # Controls rigidity
+            gamma=gamma,    # External force weight
+            max_num_iter=iterations,
+            convergence=0.1
         )
+        
+        # Create refined mask with inverted colors (white background, black object)
+        mask = np.ones_like(image, dtype=np.uint8) * 255
+        snake_points = np.round(snake).astype(np.int32)
+        cv2.fillPoly(mask, [snake_points], 0)
+        
+        # Post-process the mask
+        kernel = np.ones((3,3), np.uint8)
+        mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel, iterations=2)
+        mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel, iterations=1)
+        
+        return mask
 
 class ContourRefinement:
     @staticmethod
-    def apply_morphology(image, operation='dilate', kernel_size=3, iterations=1):
-        """Apply morphological operations for contour refinement."""
-        # First ensure we have a binary image
+    def apply_morphology(image, operation='close', kernel_size=7, iterations=2, threshold=90):
+        """Apply enhanced morphological operations for contour refinement."""
+        # Ensure proper input format
         if len(image.shape) > 2:
             image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        _, binary = cv2.threshold(image, 127, 255, cv2.THRESH_BINARY)
         
-        # Create kernel
-        kernel = np.ones((kernel_size, kernel_size), np.uint8)
+        # Enhance contrast using CLAHE
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+        enhanced = clahe.apply(image)
         
-        # First apply closing to connect broken contours
-        closed = cv2.morphologyEx(binary, cv2.MORPH_CLOSE, kernel, iterations=1)
+        # Apply thresholding with user-defined threshold (inverted to match enhance_contours)
+        _, binary = cv2.threshold(enhanced, threshold, 255, cv2.THRESH_BINARY_INV)
         
-        # Apply requested operation
+        # Create kernels of different sizes for multi-scale processing
+        kernel_small = np.ones((3,3), np.uint8)
+        kernel_main = np.ones((kernel_size, kernel_size), np.uint8)
+        
+        # Initial noise removal with bilateral filter
+        denoised = cv2.bilateralFilter(binary, 9, 75, 75)
+        
+        # Apply main morphological operation
         if operation == 'dilate':
-            result = cv2.dilate(closed, kernel, iterations=iterations)
+            result = cv2.dilate(denoised, kernel_main, iterations=iterations)
         elif operation == 'erode':
-            result = cv2.erode(closed, kernel, iterations=iterations)
+            result = cv2.erode(denoised, kernel_main, iterations=iterations)
         elif operation == 'open':
-            result = cv2.morphologyEx(closed, cv2.MORPH_OPEN, kernel, iterations=iterations)
+            result = cv2.morphologyEx(denoised, cv2.MORPH_OPEN, kernel_main, iterations=iterations)
         elif operation == 'close':
-            result = closed
+            result = cv2.morphologyEx(denoised, cv2.MORPH_CLOSE, kernel_main, iterations=iterations)
         else:
             raise ValueError(f"Unknown morphological operation: {operation}")
-            
-        # Remove small objects and fill holes
-        # Find all connected components
-        num_labels, labels = cv2.connectedComponents(result)
-        min_size = 100  # Minimum size threshold
         
-        # Remove small objects
+        # Advanced post-processing
+        # 1. Remove small objects
+        num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(result, connectivity=8)
+        min_size = 100  # Adjusted minimum size threshold
+        
         for label in range(1, num_labels):
-            mask = labels == label
-            if np.sum(mask) < min_size:
-                result[mask] = 0
+            if stats[label, cv2.CC_STAT_AREA] < min_size:
+                result[labels == label] = 0
         
-        # Fill holes using floodfill
+        # 2. Fill holes using floodfill (adjusted for white background)
         filled = result.copy()
-        mask = np.zeros((result.shape[0] + 2, result.shape[1] + 2), np.uint8)
-        cv2.floodFill(filled, mask, (0,0), 255)
+        h, w = filled.shape[:2]
+        mask = np.zeros((h+2, w+2), np.uint8)
+        cv2.floodFill(filled, mask, (0,0), 0)  # Fill with black
         filled_inv = cv2.bitwise_not(filled)
-        result = result | filled_inv
-                
+        result = cv2.bitwise_and(result, filled_inv)
+        
+        # 3. Smooth boundaries while preserving edges
+        result = cv2.bilateralFilter(result, 9, 75, 75)
+        
         return result
 
     @staticmethod
-    def enhance_contours(image, method='normalize'):
-        """Enhance contours using advanced techniques."""
-        # First ensure we have a grayscale image
+    def enhance_contours(image, threshold=127, min_area=100, max_complexity=50):
+        """Enhanced contour detection and refinement."""
+        # Convert to grayscale if needed
         if len(image.shape) > 2:
             image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         
-        # Find edges using Canny
-        edges = cv2.Canny(image, 50, 150)
+        # 1. Enhance contrast using CLAHE
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+        enhanced = clahe.apply(image)
         
-        # Find contours
-        contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        # 2. Denoise while preserving edges
+        denoised = cv2.fastNlMeansDenoising(enhanced, None, 10, 7, 21)
         
-        # Create a blank image to draw contours
-        contour_img = np.zeros_like(image)
-        cv2.drawContours(contour_img, contours, -1, (255,255,255), 2)
+        # 3. Apply bilateral filter for edge preservation
+        bilateral = cv2.bilateralFilter(denoised, 9, 75, 75)
         
-        # Apply enhancement method
-        if method == 'normalize':
-            enhanced = cv2.normalize(contour_img, None, 0, 255, cv2.NORM_MINMAX)
-        elif method == 'equalize':
-            enhanced = cv2.equalizeHist(contour_img)
-        elif method == 'adaptive':
-            clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
-            enhanced = clahe.apply(contour_img)
-        else:
-            raise ValueError(f"Unknown enhancement method: {method}")
+        # 4. Create binary image using user-defined threshold
+        _, binary = cv2.threshold(bilateral, threshold, 255, cv2.THRESH_BINARY)
         
-        return enhanced
+        # 5. Find and filter contours
+        contours, hierarchy = cv2.findContours(
+            binary,
+            cv2.RETR_EXTERNAL,
+            cv2.CHAIN_APPROX_TC89_KCOS
+        )
+        
+        # Filter contours by area and complexity
+        # Use provided min_area parameter
+        filtered_contours = []
+        for cnt in contours:
+            area = cv2.contourArea(cnt)
+            if area > min_area:
+                # Calculate contour complexity
+                perimeter = cv2.arcLength(cnt, True)
+                complexity = perimeter * perimeter / (4 * np.pi * area)
+                if complexity < max_complexity:  # Use provided max_complexity parameter
+                    filtered_contours.append(cnt)
+        
+        # 6. Create result image (white background)
+        result = np.ones_like(image) * 255
+        
+        # 7. Draw contours with adaptive thickness
+        for contour in filtered_contours:
+            area = cv2.contourArea(contour)
+            # Smooth contour
+            epsilon = 0.02 * cv2.arcLength(contour, True)
+            approx = cv2.approxPolyDP(contour, epsilon, True)
+            
+            # Calculate adaptive thickness based on contour size
+            thickness = max(1, min(3, int(np.sqrt(area) / 100)))
+            
+            # Draw filled contour with small border (black on white)
+            cv2.drawContours(result, [approx], -1, 0, -1)  # Fill with black
+            cv2.drawContours(result, [approx], -1, 0, thickness)  # Border in black
+        
+        # 8. Post-processing
+        # Apply morphological operations to smooth boundaries
+        kernel = np.ones((3,3), np.uint8)
+        result = cv2.morphologyEx(result, cv2.MORPH_CLOSE, kernel)
+        result = cv2.morphologyEx(result, cv2.MORPH_OPEN, kernel)
+        
+        # Final smoothing with edge preservation
+        result = cv2.bilateralFilter(result, 9, 75, 75)
+        
+        return result
 
     @staticmethod
     def skeletonize(binary_image):

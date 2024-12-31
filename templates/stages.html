@@ -6,6 +6,23 @@
     <title>Leaf Processing Stages</title>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap">
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <style>
+        .parameter-group {
+            margin: 10px 0;
+        }
+        .parameter-group label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        .parameter-group input[type="range"] {
+            width: 200px;
+            margin-right: 10px;
+        }
+        .parameter-group output {
+            display: inline-block;
+            min-width: 30px;
+        }
+    </style>
 </head>
 <body>
     <h1>Image Processing Stages</h1>
@@ -80,6 +97,47 @@
                     <option value="thresholding">Thresholding</option>
                     <option value="active-contours">Active Contours</option>
                 </select>
+                
+                <!-- Parameters for segmentation -->
+                <div id="segmentation_parameters" style="display: none;">
+                    <!-- Parameters for thresholding -->
+                    <div id="thresholding_params" style="display: none;">
+                        <div class="parameter-group">
+                            <label for="block_size">Block Size (3-99):</label>
+                            <input type="range" id="block_size" name="block_size" min="3" max="99" step="2" value="35"
+                                   oninput="this.nextElementSibling.value = this.value">
+                            <output>35</output>
+                        </div>
+                        <div class="parameter-group">
+                            <label for="c_value">C Value (-10 to 20):</label>
+                            <input type="range" id="c_value" name="c_value" min="-10" max="20" value="5"
+                                   oninput="this.nextElementSibling.value = this.value">
+                            <output>5</output>
+                        </div>
+                    </div>
+                    
+                    <!-- Parameters for active contours -->
+                    <div id="contours_params" style="display: none;">
+                        <div class="parameter-group">
+                            <label for="alpha">Alpha (0-0.1):</label>
+                            <input type="range" id="alpha" name="alpha" min="0" max="100" value="10"
+                                   oninput="this.nextElementSibling.value = this.value/1000">
+                            <output>0.01</output>
+                        </div>
+                        <div class="parameter-group">
+                            <label for="beta">Beta (0-0.5):</label>
+                            <input type="range" id="beta" name="beta" min="0" max="500" value="100"
+                                   oninput="this.nextElementSibling.value = this.value/1000">
+                            <output>0.1</output>
+                        </div>
+                        <div class="parameter-group">
+                            <label for="iterations">Iterations (50-500):</label>
+                            <input type="range" id="iterations" name="iterations" min="50" max="500" value="200"
+                                   oninput="this.nextElementSibling.value = this.value">
+                            <output>200</output>
+                        </div>
+                    </div>
+                </div>
             </div>
             <div class="stage-preview" id="segmentation-preview">
                 <div class="preview-placeholder">Preview will appear here after processing</div>
@@ -96,6 +154,48 @@
                     <option value="morphological">Morphological Operations</option>
                     <option value="enhancement">Enhancement</option>
                 </select>
+
+                <!-- Parameters for contour refinement -->
+                <div id="contour_parameters" style="display: none;">
+                    <div class="parameter-group">
+                        <label for="threshold">Threshold (0-255):</label>
+                        <input type="range" id="threshold" name="threshold" min="0" max="255" value="127" 
+                               oninput="this.nextElementSibling.value = this.value">
+                        <output>127</output>
+                    </div>
+
+                    <!-- Parameters for morphological operations -->
+                    <div id="morphological_params" style="display: none;">
+                        <div class="parameter-group">
+                            <label for="kernel_size">Kernel Size (3-15):</label>
+                            <input type="range" id="kernel_size" name="kernel_size" min="3" max="15" step="2" value="5"
+                                   oninput="this.nextElementSibling.value = this.value">
+                            <output>5</output>
+                        </div>
+                        <div class="parameter-group">
+                            <label for="iterations">Iterations (1-5):</label>
+                            <input type="range" id="iterations" name="iterations" min="1" max="5" value="1"
+                                   oninput="this.nextElementSibling.value = this.value">
+                            <output>1</output>
+                        </div>
+                    </div>
+
+                    <!-- Parameters for enhancement -->
+                    <div id="enhancement_params" style="display: none;">
+                        <div class="parameter-group">
+                            <label for="min_area">Minimum Area (50-500):</label>
+                            <input type="range" id="min_area" name="min_area" min="50" max="500" value="100"
+                                   oninput="this.nextElementSibling.value = this.value">
+                            <output>100</output>
+                        </div>
+                        <div class="parameter-group">
+                            <label for="max_complexity">Max Complexity (10-100):</label>
+                            <input type="range" id="max_complexity" name="max_complexity" min="10" max="100" value="50"
+                                   oninput="this.nextElementSibling.value = this.value">
+                            <output>50</output>
+                        </div>
+                    </div>
+                </div>
             </div>
             <div class="stage-preview" id="contour-refinement-preview">
                 <div class="preview-placeholder">Preview will appear here after processing</div>
@@ -128,6 +228,19 @@
             const formData = new FormData();
             formData.append('stage', stageId);
             formData.append(stageId, document.getElementById(stageId).value);
+            
+            // Add contour refinement parameters if applicable
+            if (stageId === 'contour_refinement' && document.getElementById(stageId).value !== 'none') {
+                formData.append('threshold', document.getElementById('threshold').value);
+                
+                if (document.getElementById(stageId).value === 'morphological') {
+                    formData.append('kernel_size', document.getElementById('kernel_size').value);
+                    formData.append('iterations', document.getElementById('iterations').value);
+                } else if (document.getElementById(stageId).value === 'enhancement') {
+                    formData.append('min_area', document.getElementById('min_area').value);
+                    formData.append('max_complexity', document.getElementById('max_complexity').value);
+                }
+            }
             
             fetch(window.location.href, {
                 method: 'POST',
@@ -183,11 +296,65 @@
         });
 
         document.getElementById('segmentation').addEventListener('change', function() {
+            const paramsDiv = document.getElementById('segmentation_parameters');
+            const thresholdingParams = document.getElementById('thresholding_params');
+            const contoursParams = document.getElementById('contours_params');
+            
+            // Hide all parameter divs initially
+            paramsDiv.style.display = 'none';
+            thresholdingParams.style.display = 'none';
+            contoursParams.style.display = 'none';
+            
+            // Show appropriate parameter divs based on selection
+            if (this.value === 'thresholding') {
+                paramsDiv.style.display = 'block';
+                thresholdingParams.style.display = 'block';
+            } else if (this.value === 'active-contours') {
+                paramsDiv.style.display = 'block';
+                contoursParams.style.display = 'block';
+            }
+            
             processStage('segmentation');
         });
 
+        // Add listeners for segmentation parameter changes
+        ['block_size', 'c_value', 'alpha', 'beta', 'iterations'].forEach(param => {
+            const element = document.getElementById(param);
+            if (element) {
+                element.addEventListener('input', function() {
+                    processStage('segmentation');
+                });
+            }
+        });
+
         document.getElementById('contour_refinement').addEventListener('change', function() {
+            const paramsDiv = document.getElementById('contour_parameters');
+            const morphologicalParams = document.getElementById('morphological_params');
+            const enhancementParams = document.getElementById('enhancement_params');
+            
+            // Hide all parameter divs initially
+            paramsDiv.style.display = 'none';
+            morphologicalParams.style.display = 'none';
+            enhancementParams.style.display = 'none';
+            
+            // Show appropriate parameter divs based on selection
+            if (this.value !== 'none') {
+                paramsDiv.style.display = 'block';
+                if (this.value === 'morphological') {
+                    morphologicalParams.style.display = 'block';
+                } else if (this.value === 'enhancement') {
+                    enhancementParams.style.display = 'block';
+                }
+            }
+            
             processStage('contour_refinement');
+        });
+
+        // Add listeners for parameter changes
+        ['threshold', 'kernel_size', 'iterations', 'min_area', 'max_complexity'].forEach(param => {
+            document.getElementById(param).addEventListener('input', function() {
+                processStage('contour_refinement');
+            });
         });
 
         // Prevent form submission

@@ -9,7 +9,7 @@ from plant_detector import PlantDetector
 app = Flask(__name__)
 
 # Initialize plant detector
-plant_detector = PlantDetector(model_path='model/best.keras')
+plant_detector = PlantDetector(model_path='models/best.keras')
 
 # Configurations
 UPLOAD_FOLDER = './uploads'
@@ -115,24 +115,84 @@ def stages(filename):
             processing_states[filename]['edge_detection'] = method
             
         elif current_stage == 'segmentation':
-            input_image = processed_image
+            # Use the edge-detected image for segmentation if available, otherwise use noise-cleaned
+            if processing_states[filename]['edge_detection']:
+                input_image = processing_states[filename]['current_image']
+            elif processing_states[filename]['noise_cleaning']:
+                # Get the noise-cleaned image state
+                noise_cleaned = processing_states[filename]['current_image']
+                # Apply light Gaussian blur for better segmentation
+                input_image = cv2.GaussianBlur(noise_cleaned, (3,3), 0)
+            else:
+                # If no previous processing, use original with preprocessing
+                input_image = cv2.GaussianBlur(processing_states[filename]['original_image'], (3,3), 0)
             method = request.form.get('segmentation')
             if method == 'thresholding':
-                processed_image = Segmentation.otsu(input_image)
+                # Get thresholding parameters
+                block_size = int(request.form.get('block_size', 35))
+                c_value = int(request.form.get('c_value', 5))
+                processed_image = Segmentation.otsu(input_image, block_size, c_value)
             elif method == 'active-contours':
+                # Get active contours parameters
+                alpha = float(request.form.get('alpha', 10)) / 1000  # Convert from 0-100 to 0-0.1
+                beta = float(request.form.get('beta', 100)) / 1000   # Convert from 0-500 to 0-0.5
+                iterations = int(request.form.get('iterations', 200))
+                
                 height, width = input_image.shape
-                initial_contour = np.array([[50, 50], [width-50, 50], 
-                                          [width-50, height-50], [50, height-50]])
-                processed_image = Segmentation.active_contour(input_image, initial_contour)
+                # Create initial contour as 80% of image dimensions
+                margin_x = int(width * 0.1)  # 10% margin from edges
+                margin_y = int(height * 0.1)
+                initial_contour = np.array([
+                    [margin_x, margin_y],
+                    [width - margin_x, margin_y],
+                    [width - margin_x, height - margin_y],
+                    [margin_x, height - margin_y]
+                ])
+                processed_image = Segmentation.active_contour(
+                    input_image, 
+                    initial_contour,
+                    alpha=alpha,
+                    beta=beta,
+                    gamma=0.001,
+                    iterations=iterations
+                )
             processing_states[filename]['segmentation'] = method
             
         elif current_stage == 'contour_refinement':
-            input_image = processed_image
+            # Always use the segmented image for contour refinement
+            if processing_states[filename]['segmentation']:
+                input_image = processing_states[filename]['current_image']
+            else:
+                # If no segmentation, apply basic preprocessing
+                input_image = processing_states[filename]['original_image']
+                # Apply CLAHE for better contrast
+                clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+                input_image = clahe.apply(input_image)
+                # Apply bilateral filter for edge preservation
+                input_image = cv2.bilateralFilter(input_image, 9, 75, 75)
             method = request.form.get('contour_refinement')
+            # Get user-defined parameters with defaults
+            threshold = int(request.form.get('threshold', 127))
+            min_area = int(request.form.get('min_area', 100))
+            max_complexity = int(request.form.get('max_complexity', 50))
+            kernel_size = int(request.form.get('kernel_size', 5))
+            iterations = int(request.form.get('iterations', 1))
+            
             if method == 'morphological':
-                processed_image = ContourRefinement.apply_morphology(input_image, operation='close')
+                processed_image = ContourRefinement.apply_morphology(
+                    input_image, 
+                    operation='close',
+                    kernel_size=kernel_size,
+                    iterations=iterations,
+                    threshold=threshold
+                )
             elif method == 'enhancement':
-                processed_image = ContourRefinement.enhance_contours(input_image)
+                processed_image = ContourRefinement.enhance_contours(
+                    input_image,
+                    threshold=threshold,
+                    min_area=min_area,
+                    max_complexity=max_complexity
+                )
             processing_states[filename]['contour_refinement'] = method
 
         # Update current image state
