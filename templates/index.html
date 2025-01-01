@@ -4,239 +4,25 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Leaf Detector</title>
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap">
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
-    <style>
-        .drop-zone {
-            width: 100%;
-            max-width: 500px;
-            height: 200px;
-            padding: 25px;
-            margin: 25px auto;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            text-align: center;
-            cursor: pointer;
-            border: 2px dashed var(--primary-color);
-            border-radius: 10px;
-            transition: all 0.3s ease;
-        }
-
-        .drop-zone:hover {
-            background-color: rgba(108, 92, 231, 0.1);
-            border-color: var(--secondary-color);
-        }
-
-        .drop-zone.dragover {
-            background-color: rgba(108, 92, 231, 0.2);
-            border-color: var(--secondary-color);
-        }
-
-        .drop-zone__prompt {
-            font-size: 1.2em;
-            color: var(--primary-color);
-            transition: all 0.3s ease;
-        }
-
-        .drop-zone__input {
-            display: none;
-        }
-
-        .drop-zone__thumb {
-            width: 100%;
-            height: 100%;
-            border-radius: 10px;
-            overflow: hidden;
-            background-color: #cccccc;
-            background-size: cover;
-            background-position: center;
-            position: relative;
-            display: none;
-        }
-
-        .drop-zone__thumb::after {
-            content: attr(data-label);
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            width: 100%;
-            padding: 5px 0;
-            color: #ffffff;
-            background: rgba(0, 0, 0, 0.75);
-            font-size: 14px;
-            text-align: center;
-        }
-
-        .error-message {
-            color: #dc3545;
-            text-align: center;
-            margin: 10px 0;
-            display: none;
-        }
-
-        .upload-btn {
-            display: block;
-            width: 200px;
-            margin: 20px auto;
-            padding: 12px 24px;
-            background-color: var(--primary-color);
-            color: white;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 16px;
-            font-weight: 500;
-            transition: all 0.3s ease;
-        }
-
-        .upload-btn:hover {
-            background-color: var(--secondary-color);
-            transform: translateY(-2px);
-        }
-
-        .upload-btn:disabled {
-            background-color: #cccccc;
-            cursor: not-allowed;
-            transform: none;
-        }
-    </style>
 </head>
 <body>
     <div class="content">
         <h1>Leaf Detector</h1>
-        <p class="subtitle">Upload a leaf image to analyze and identify plant species</p>
-
-        <form id="uploadForm" action="/" method="POST" enctype="multipart/form-data">
-            <div class="drop-zone">
-                <span class="drop-zone__prompt">Drop file here or click to upload</span>
-                <div class="drop-zone__thumb"></div>
-                <input type="file" name="image" class="drop-zone__input" accept="image/*" required>
-            </div>
-            <div class="error-message"></div>
-            <button type="submit" class="upload-btn" disabled>Upload and Process</button>
-        </form>
-
-        <div class="instructions">
-            <h3>How it works:</h3>
-            <ol>
-                <li>Upload a clear image of a leaf (drag & drop or click to select)</li>
-                <li>Apply various image processing techniques</li>
-                <li>Get plant species identification results</li>
-            </ol>
+        <div class="options">
+            <a href="/process-image" class="option-card">
+                <h2>Process Image</h2>
+                <p>Apply various image processing filters and download results</p>
+            </a>
+            <a href="/plant-detection" class="option-card">
+                <h2>Plant Detection</h2>
+                <p>Upload leaf image for species identification</p>
+            </a>
+            <a href="/tea-leaf-age" class="option-card">
+                <h2>Detect Tea Leaf Age</h2>
+                <p>Coming soon</p>
+            </a>
         </div>
     </div>
-
-    <script>
-        document.querySelectorAll(".drop-zone").forEach(dropZone => {
-            const input = dropZone.querySelector(".drop-zone__input");
-            const prompt = dropZone.querySelector(".drop-zone__prompt");
-            const thumb = dropZone.querySelector(".drop-zone__thumb");
-            const errorMessage = document.querySelector(".error-message");
-            const submitButton = document.querySelector(".upload-btn");
-
-            // Click to upload
-            dropZone.addEventListener("click", e => {
-                input.click();
-            });
-
-            // Handle change event
-            input.addEventListener("change", e => {
-                if (input.files.length) {
-                    handleFiles(input.files);
-                }
-            });
-
-            // Drag and drop handlers
-            dropZone.addEventListener("dragover", e => {
-                e.preventDefault();
-                dropZone.classList.add("dragover");
-            });
-
-            ["dragleave", "dragend"].forEach(type => {
-                dropZone.addEventListener(type, e => {
-                    dropZone.classList.remove("dragover");
-                });
-            });
-
-            dropZone.addEventListener("drop", e => {
-                e.preventDefault();
-                dropZone.classList.remove("dragover");
-
-                if (e.dataTransfer.files.length) {
-                    input.files = e.dataTransfer.files;
-                    handleFiles(e.dataTransfer.files);
-                }
-            });
-
-            // Handle selected files
-            function handleFiles(files) {
-                const file = files[0];
-                
-                // Validate file type
-                if (!file.type.startsWith("image/")) {
-                    showError("Please upload an image file");
-                    resetUpload();
-                    return;
-                }
-
-                // Validate file size (max 5MB)
-                if (file.size > 5 * 1024 * 1024) {
-                    showError("File size should be less than 5MB");
-                    resetUpload();
-                    return;
-                }
-
-                // Clear any previous error
-                hideError();
-
-                // Enable submit button
-                submitButton.disabled = false;
-
-                // Update thumbnail
-                updateThumbnail(file);
-            }
-
-            function updateThumbnail(file) {
-                // Show thumbnail container
-                thumb.style.display = "block";
-                prompt.style.display = "none";
-
-                // Set thumbnail label
-                thumb.dataset.label = file.name;
-
-                // Read and show image
-                const reader = new FileReader();
-                reader.readAsDataURL(file);
-                reader.onload = () => {
-                    thumb.style.backgroundImage = `url('${reader.result}')`;
-                };
-            }
-
-            function showError(message) {
-                errorMessage.textContent = message;
-                errorMessage.style.display = "block";
-            }
-
-            function hideError() {
-                errorMessage.style.display = "none";
-            }
-
-            function resetUpload() {
-                input.value = "";
-                thumb.style.display = "none";
-                prompt.style.display = "block";
-                thumb.style.backgroundImage = "";
-                submitButton.disabled = true;
-            }
-        });
-
-        // Form submission handler
-        document.getElementById("uploadForm").addEventListener("submit", function(e) {
-            const submitButton = document.querySelector(".upload-btn");
-            submitButton.disabled = true;
-            submitButton.textContent = "Uploading...";
-        });
-    </script>
 </body>
 </html>

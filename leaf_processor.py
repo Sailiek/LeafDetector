@@ -11,6 +11,25 @@ class ImagePreprocessor:
             return cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         return image
 
+    @staticmethod
+    def binary_threshold(image, threshold=127, invert=False):
+        """Apply binary thresholding to an image."""
+        _, thresh = cv2.threshold(image, threshold, 255, 
+                                cv2.THRESH_BINARY_INV if invert else cv2.THRESH_BINARY)
+        return thresh
+
+    @staticmethod
+    def adaptive_threshold(image, block_size=11, C=2):
+        """Apply adaptive thresholding to an image."""
+        return cv2.adaptiveThreshold(image, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+                                   cv2.THRESH_BINARY, block_size, C)
+
+    @staticmethod
+    def otsu_threshold(image):
+        """Apply Otsu's thresholding to an image."""
+        _, thresh = cv2.threshold(image, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        return thresh
+
 class LinearNoiseReduction:
     """Class for linear noise reduction methods that use convolution operations."""
     

@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Plant Detection - Leaf Detector</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <style>
+        .detection-container {
+            max-width: 1200px;
+            margin: 20px auto;
+            padding: 30px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .image-section {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .image-preview {
+            flex: 1;
+            text-align: center;
+        }
+
+        .image-preview img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+        }
+
+        .edge-detection-options {
+            margin: 20px 0;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        .edge-detection-options h3 {
+            margin-bottom: 15px;
+            color: #6c5ce7;
+        }
+
+        .edge-options {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+        }
+
+        .edge-option {
+            padding: 15px 30px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .edge-option:hover {
+            border-color: #6c5ce7;
+            box-shadow: 0 2px 8px rgba(108, 92, 231, 0.2);
+        }
+
+        .edge-option.active {
+            border-color: #6c5ce7;
+            background-color: rgba(108, 92, 231, 0.1);
+        }
+
+        .results-section {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        .results-section h3 {
+            margin-bottom: 15px;
+            color: #6c5ce7;
+        }
+
+        .result-item {
+            margin: 10px 0;
+            font-size: 16px;
+        }
+
+        .result-value {
+            font-weight: bold;
+            color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <div class="detection-container">
+        <h1>Plant Detection</h1>
+        
+        <div class="image-section">
+            <div class="image-preview">
+                <h3>Uploaded Image</h3>
+                <div class="drop-zone">
+                    <span class="drop-zone__prompt">Drop file here or click to upload</span>
+                    <div class="drop-zone__thumb"></div>
+                    <input type="file" name="image" class="drop-zone__input" accept="image/*" required>
+                </div>
+            </div>
+            <div class="image-preview">
+                <h3>Processed Image</h3>
+                <div class="processed-image-placeholder">
+                    <p>Processed image will appear here</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="edge-detection-options">
+            <h3>Select Edge Detection Method</h3>
+            <div class="edge-options">
+                <div class="edge-option" data-method="sobel">Sobel</div>
+                <div class="edge-option" data-method="canny">Canny</div>
+                <div class="edge-option" data-method="prewitt">Prewitt</div>
+            </div>
+        </div>
+
+        <div class="results-section">
+            <h3>Detection Results</h3>
+            <div class="result-item">
+                Plant Type: <span class="result-value" id="plant-type">-</span>
+            </div>
+            <div class="result-item">
+                Confidence: <span class="result-value" id="confidence">-</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // JavaScript for handling image upload, processing, and results display
+        // Will be implemented in the next steps
+    </script>
+</body>
+</html>
