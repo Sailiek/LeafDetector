@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Leaf Age Detection - Leaf Detector</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <style>
+        .age-container {
+            max-width: 1200px;
+            margin: 20px auto;
+            padding: 30px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        .image-section {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .image-preview {
+            text-align: center;
+        }
+        
+        .image-preview img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            margin-top: 10px;
+        }
+        
+        .results-section {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+        
+        .results-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        
+        .results-table th,
+        .results-table td {
+            padding: 12px;
+            border: 1px solid #dee2e6;
+            text-align: left;
+        }
+        
+        .results-table th {
+            background-color: #6c5ce7;
+            color: white;
+        }
+        
+        .results-table tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+    </style>
+</head>
+<body>
+    <div class="age-container">
+        <h1>Leaf Age Detection</h1>
+        
+        <div class="image-section">
+            <div class="image-preview">
+                <h3>Upload Image</h3>
+                <div class="drop-zone">
+                    <span class="drop-zone__prompt">Drop file here or click to upload</span>
+                    <div class="drop-zone__thumb"></div>
+                    <input type="file" name="image" class="drop-zone__input" accept="image/*" required>
+                </div>
+            </div>
+            <div class="image-preview">
+                <h3>Binary Image</h3>
+                <div id="binary-image-container">
+                    <p>Binary image will appear here</p>
+                </div>
+            </div>
+            <div class="image-preview">
+                <h3>Processed Image</h3>
+                <div id="result-image-container">
+                    <p>Processed image will appear here</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="results-section">
+            <h3>Analysis Results</h3>
+            <table class="results-table">
+                <thead>
+                    <tr>
+                        <th>Contour ID</th>
+                        <th>Area</th>
+                        <th>Perimeter</th>
+                        <th>Estimated Age (days)</th>
+                    </tr>
+                </thead>
+                <tbody id="results-body">
+                    <tr>
+                        <td colspan="4" class="text-center">Upload an image to see results</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const dropZone = document.querySelector('.drop-zone');
+            const input = dropZone.querySelector('.drop-zone__input');
+            const prompt = dropZone.querySelector('.drop-zone__prompt');
+            const thumb = dropZone.querySelector('.drop-zone__thumb');
+            
+            // Handle file selection
+            dropZone.addEventListener('click', () => input.click());
+            
+            input.addEventListener('change', (e) => {
+                if (input.files.length) {
+                    handleFile(input.files[0]);
+                }
+            });
+            
+            // Handle drag and drop
+            ['dragover', 'dragleave', 'drop'].forEach(event => {
+                dropZone.addEventListener(event, (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    dropZone.classList.toggle('dragover', event === 'dragover');
+                    
+                    if (event === 'drop' && e.dataTransfer.files.length) {
+                        input.files = e.dataTransfer.files;
+                        handleFile(e.dataTransfer.files[0]);
+                    }
+                });
+            });
+            
+            async function handleFile(file) {
+                if (!file.type.startsWith('image/')) {
+                    alert('Please upload an image file');
+                    return;
+                }
+                
+                updateThumbnail(file);
+                await processImage(file);
+            }
+            
+            function updateThumbnail(file) {
+                thumb.style.display = 'block';
+                prompt.style.display = 'none';
+                
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = () => {
+                    thumb.style.backgroundImage = `url('${reader.result}')`;
+                };
+            }
+            
+            async function processImage(file) {
+                const formData = new FormData();
+                formData.append('image', file);
+                
+                try {
+                    const response = await fetch('/leaf-age', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error('Processing failed');
+                    }
+                    
+                    const data = await response.json();
+                    
+                    // Update images
+                    document.getElementById('binary-image-container').innerHTML = `
+                        <img src="/uploads/${data.binary_image}" alt="Binary Image">
+                    `;
+                    
+                    document.getElementById('result-image-container').innerHTML = `
+                        <img src="/uploads/${data.result_image}" alt="Result Image">
+                    `;
+                    
+                    // Update results table
+                    const resultsBody = document.getElementById('results-body');
+                    resultsBody.innerHTML = data.results.map(result => `
+                        <tr>
+                            <td>${result.contour_id}</td>
+                            <td>${result.area}</td>
+                            <td>${result.perimeter}</td>
+                            <td>${result.estimated_age}</td>
+                        </tr>
+                    `).join('');
+                    
+                } catch (error) {
+                    console.error('Error:', error);
+                    alert('Error processing image');
+                }
+            }
+        });
+    </script>
+</body>
+</html>

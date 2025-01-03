@@ -133,8 +133,133 @@
     </div>
 
     <script>
-        // JavaScript for handling image upload, processing, and results display
-        // Will be implemented in the next steps
+document.addEventListener('DOMContentLoaded', function() {
+    const dropZone = document.querySelector('.drop-zone');
+    const input = dropZone.querySelector('.drop-zone__input');
+    const prompt = dropZone.querySelector('.drop-zone__prompt');
+    const thumb = dropZone.querySelector('.drop-zone__thumb');
+    const edgeOptions = document.querySelectorAll('.edge-option');
+    let currentFile = null;
+    let currentEdgeMethod = 'sobel'; // default method
+
+    // Handle file selection
+    dropZone.addEventListener('click', () => input.click());
+    
+    input.addEventListener('change', (e) => {
+        if (input.files.length) {
+            handleFile(input.files[0]);
+        }
+    });
+
+    // Handle drag and drop
+    ['dragover', 'dragleave', 'drop'].forEach(event => {
+        dropZone.addEventListener(event, (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            dropZone.classList.toggle('dragover', event === 'dragover');
+            
+            if (event === 'drop' && e.dataTransfer.files.length) {
+                input.files = e.dataTransfer.files;
+                handleFile(e.dataTransfer.files[0]);
+            }
+        });
+    });
+
+    // Handle edge detection method selection
+    edgeOptions.forEach(option => {
+        option.addEventListener('click', () => {
+            edgeOptions.forEach(o => o.classList.remove('active'));
+            option.classList.add('active');
+            currentEdgeMethod = option.dataset.method;
+            
+            if (currentFile) {
+                processImage(currentFile, currentEdgeMethod);
+            }
+        });
+    });
+
+    function handleFile(file) {
+        // Validate file
+        if (!file.type.startsWith('image/')) {
+            alert('Please upload an image file');
+            return;
+        }
+
+        if (file.size > 5 * 1024 * 1024) {
+            alert('File size should be less than 5MB');
+            return;
+        }
+
+        currentFile = file;
+        updateThumbnail(file);
+        processImage(file, currentEdgeMethod);
+    }
+
+    function updateThumbnail(file) {
+        thumb.style.display = 'block';
+        prompt.style.display = 'none';
+        thumb.dataset.label = file.name;
+
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => {
+            thumb.style.backgroundImage = `url('${reader.result}')`;
+        };
+    }
+
+    async function processImage(file, edgeMethod) {
+        // Show loading state
+        const processedContainer = document.querySelector('.processed-image-placeholder');
+        processedContainer.innerHTML = '<p>Processing...</p>';
+        
+        // Reset results
+        document.getElementById('plant-type').textContent = '-';
+        document.getElementById('confidence').textContent = '-';
+
+        // Create form data
+        const formData = new FormData();
+        formData.append('image', file);
+        formData.append('edge_method', edgeMethod);
+
+        try {
+            const response = await fetch('/plant-detection', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!response.ok) {
+                throw new Error('Processing failed');
+            }
+
+            const data = await response.json();
+            
+            // Update processed image with timestamp to prevent caching
+            const timestamp = new Date().getTime();
+            updateProcessedImage(`${data.processed}?t=${timestamp}`);
+            
+            // Update detection results
+            document.getElementById('plant-type').textContent = data.detection.plant_type;
+            document.getElementById('confidence').textContent = data.detection.confidence;
+            
+        } catch (error) {
+            processedContainer.innerHTML = '<p>Error processing image</p>';
+            console.error('Error:', error);
+        }
+    }
+
+    function updateProcessedImage(filename) {
+        const processedContainer = document.querySelector('.processed-image-placeholder');
+        processedContainer.innerHTML = `
+            <img src="/uploads/${filename}" alt="Processed Image" style="max-width: 100%; height: auto; border-radius: 8px;">
+        `;
+    }
+
+    // Set default active edge detection method
+    const defaultEdgeOption = document.querySelector('.edge-option[data-method="sobel"]');
+    if (defaultEdgeOption) {
+        defaultEdgeOption.classList.add('active');
+    }
+});
     </script>
 </body>
 </html>

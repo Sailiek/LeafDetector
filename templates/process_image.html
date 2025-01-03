@@ -92,6 +92,7 @@
                 <h3>Processed Image</h3>
                 <div class="processed-image-placeholder">
                     <p>Processed image will appear here</p>
+                    <img id="processed-image" src="" alt="Processed Image" style="display:none;">
                 </div>
             </div>
         </div>
@@ -133,121 +134,203 @@
     </div>
 
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const dropZone = document.querySelector('.drop-zone');
-            const input = dropZone.querySelector('.drop-zone__input');
-            const prompt = dropZone.querySelector('.drop-zone__prompt');
-            const thumb = dropZone.querySelector('.drop-zone__thumb');
-            const errorMessage = document.querySelector('.error-message');
-            const filterOptions = document.querySelectorAll('.filter-option');
-            const uploadBtn = document.querySelector('.upload-btn');
-            let currentFile = null;
+document.addEventListener('DOMContentLoaded', function() {
+    const dropZone = document.querySelector('.drop-zone');
+    const input = dropZone.querySelector('.drop-zone__input');
+    const prompt = dropZone.querySelector('.drop-zone__prompt');
+    const thumb = dropZone.querySelector('.drop-zone__thumb');
+    const errorMessage = document.querySelector('.error-message');
+    const filterOptions = document.querySelectorAll('.filter-option');
+    const uploadBtn = document.querySelector('.upload-btn');
+    const downloadBtn = document.getElementById('downloadBtn');
+    let currentFile = null;
 
-            // Handle file selection
-            dropZone.addEventListener('click', () => input.click());
+    // Handle file selection
+    dropZone.addEventListener('click', () => input.click());
+    
+    input.addEventListener('change', (e) => {
+        if (input.files.length) {
+            handleFile(input.files[0]);
+        }
+    });
+
+    // Handle drag and drop
+    ['dragover', 'dragleave', 'drop'].forEach(event => {
+        dropZone.addEventListener(event, (e) => {
+            e.preventDefault();
+            dropZone.classList.toggle('dragover', event === 'dragover');
             
-            input.addEventListener('change', (e) => {
-                if (input.files.length) {
-                    handleFile(input.files[0]);
-                }
-            });
-
-            // Handle drag and drop
-            ['dragover', 'dragleave', 'drop'].forEach(event => {
-                dropZone.addEventListener(event, (e) => {
-                    e.preventDefault();
-                    dropZone.classList.toggle('dragover', event === 'dragover');
-                    
-                    if (event === 'drop' && e.dataTransfer.files.length) {
-                        input.files = e.dataTransfer.files;
-                        handleFile(e.dataTransfer.files[0]);
-                    }
-                });
-            });
-
-            // Handle filter selection
-            filterOptions.forEach(option => {
-                option.addEventListener('click', async () => {
-                    if (!currentFile) {
-                        showError('Please upload an image first');
-                        return;
-                    }
-
-                    // Remove active class from all options
-                    filterOptions.forEach(o => o.classList.remove('active'));
-                    // Add active class to selected option
-                    option.classList.add('active');
-
-                    // Process image with selected filter
-                    const formData = new FormData();
-                    formData.append('image', currentFile);
-                    formData.append('filter', option.dataset.filter);
-
-                    try {
-                        const response = await fetch('/process-image', {
-                            method: 'POST',
-                            body: formData
-                        });
-
-                        if (!response.ok) {
-                            throw new Error('Processing failed');
-                        }
-
-                        const data = await response.json();
-                        updateProcessedImage(data.processed);
-                    } catch (error) {
-                        showError('Error processing image');
-                        console.error(error);
-                    }
-                });
-            });
-
-            function handleFile(file) {
-                // Validate file
-                if (!file.type.startsWith('image/')) {
-                    showError('Please upload an image file');
-                    return;
-                }
-
-                if (file.size > 5 * 1024 * 1024) {
-                    showError('File size should be less than 5MB');
-                    return;
-                }
-
-                currentFile = file;
-                hideError();
-                updateThumbnail(file);
-                uploadBtn.disabled = false;
-            }
-
-            function updateThumbnail(file) {
-                thumb.style.display = 'block';
-                prompt.style.display = 'none';
-                thumb.dataset.label = file.name;
-
-                const reader = new FileReader();
-                reader.readAsDataURL(file);
-                reader.onload = () => {
-                    thumb.style.backgroundImage = `url('${reader.result}')`;
-                };
-            }
-
-            function updateProcessedImage(filename) {
-                const processedContainer = document.querySelector('.processed-image-placeholder');
-                processedContainer.innerHTML = `
-                    <img src="/uploads/${filename}" alt="Processed Image">
-                `;
-            }
-
-            function showError(message) {
-                errorMessage.textContent = message;
-                errorMessage.style.display = 'block';
-            }
-
-            function hideError() {
-                errorMessage.style.display = 'none';
+            if (event === 'drop' && e.dataTransfer.files.length) {
+                input.files = e.dataTransfer.files;
+                handleFile(e.dataTransfer.files[0]);
             }
         });
+    });
+
+    // Handle filter selection
+    filterOptions.forEach(option => {
+        option.addEventListener('click', async () => {
+            if (!currentFile) {
+                showError('Please upload an image first');
+                return;
+            }
+
+            // Remove active class from all options
+            filterOptions.forEach(o => o.classList.remove('active'));
+            // Add active class to selected option
+            option.classList.add('active');
+
+            // Show loading state
+            const processedContainer = document.querySelector('.processed-image-placeholder');
+            processedContainer.innerHTML = '<p>Processing...</p>';
+
+            // Process image with selected filter
+            const formData = new FormData();
+            formData.append('image', currentFile);
+            formData.append('filter', option.dataset.filter);
+
+            try {
+                const response = await fetch('/process-image', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error('Processing failed');
+                }
+
+                const data = await response.json();
+                
+                // Add timestamp to prevent browser caching
+                const timestamp = new Date().getTime();
+                updateProcessedImage(`${data.processed}?t=${timestamp}`);
+                downloadBtn.disabled = false;
+            } catch (error) {
+                showError('Error processing image');
+                console.error(error);
+            }
+        });
+    });
+
+    function handleFile(file) {
+        // Validate file
+        if (!file.type.startsWith('image/')) {
+            showError('Please upload an image file');
+            return;
+        }
+
+        if (file.size > 5 * 1024 * 1024) {
+            showError('File size should be less than 5MB');
+            return;
+        }
+
+        currentFile = file;
+        hideError();
+        updateThumbnail(file);
+        
+        // Reset processed image when new file is uploaded
+        const processedContainer = document.querySelector('.processed-image-placeholder');
+        processedContainer.innerHTML = '<p>Processed image will appear here</p>';
+        downloadBtn.disabled = true;
+        
+        // Reset filter selections
+        filterOptions.forEach(o => o.classList.remove('active'));
+        
+        downloadBtn.disabled = true;
+        currentProcessedImage = null;
+    }
+
+    function updateThumbnail(file) {
+        thumb.style.display = 'block';
+        prompt.style.display = 'none';
+        thumb.dataset.label = file.name;
+
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => {
+            thumb.style.backgroundImage = `url('${reader.result}')`;
+        };
+    }
+
+    function updateProcessedImage(filename) {
+        const processedContainer = document.querySelector('.processed-image-placeholder');
+        processedContainer.innerHTML = `
+            <img src="/uploads/${filename}" alt="Processed Image" style="max-width: 100%; height: auto;">
+        `;
+    }
+
+    function showError(message) {
+        errorMessage.textContent = message;
+        errorMessage.style.display = 'block';
+    }
+
+    function hideError() {
+        errorMessage.style.display = 'none';
+    }
+    let currentProcessedImage = null;
+
+    // Handle filter selection
+    filterOptions.forEach(option => {
+        option.addEventListener('click', async () => {
+            if (!currentFile) {
+                showError('Please upload an image first');
+                return;
+            }
+
+            // Remove active class from all options
+            filterOptions.forEach(o => o.classList.remove('active'));
+            // Add active class to selected option
+            option.classList.add('active');
+
+            // Show loading state
+            const processedContainer = document.querySelector('.processed-image-placeholder');
+            processedContainer.innerHTML = '<p>Processing...</p>';
+
+            // Process image with selected filter
+            const formData = new FormData();
+            formData.append('image', currentFile);
+            formData.append('filter', option.dataset.filter);
+
+            try {
+                const response = await fetch('/process-image', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error('Processing failed');
+                }
+
+                const data = await response.json();
+                
+                // Add timestamp to prevent browser caching
+                const timestamp = new Date().getTime();
+                updateProcessedImage(`${data.processed}?t=${timestamp}`);
+                
+                // Enable download button and store download URL
+                downloadBtn.disabled = false;
+                currentProcessedImage = data.download_url;
+            } catch (error) {
+                showError('Error processing image');
+                console.error(error);
+            }
+        });
+    });
+
+    // Add download button click handler
+    downloadBtn.addEventListener('click', () => {
+        if (currentProcessedImage) {
+            // Create a temporary link and trigger download
+            const link = document.createElement('a');
+            link.href = currentProcessedImage;
+            link.download = ''; // This will use the server's filename
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+    });
+
+});
     </script>
 </body>
 </html>
