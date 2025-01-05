@@ -219,61 +219,50 @@ def leaf_age():
             gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
             blurred = cv2.GaussianBlur(gray, (5, 5), 0)
 
-            # Step 2: Adaptive Thresholding
-            processed_image = cv2.adaptiveThreshold(
-                blurred, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 11, 2
-            )
+            # Step 2: Otsu's Thresholding
+            _, binary = cv2.threshold(blurred, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
 
             # Step 3: Morphological Operations
-            kernel = np.ones((3, 3), np.uint8)
-            processed_image = cv2.morphologyEx(processed_image, cv2.MORPH_CLOSE, kernel)
+            kernel = np.ones((5, 5), np.uint8)
+            binary = cv2.morphologyEx(binary, cv2.MORPH_CLOSE, kernel)  # Close small holes
+            binary = cv2.morphologyEx(binary, cv2.MORPH_OPEN, kernel)  # Remove small noise
             
-            # Step 4: Edge Detection
-            edges = cv2.Canny(blurred, 50, 150)
-            processed_image = cv2.bitwise_or(processed_image, edges)
-            
-            # Step 5: Contour Extraction
-            contours, _ = cv2.findContours(processed_image, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-            
-            # Step 6: Find and Keep Only the Largest Contour
-            min_area = 1500  # Ignore noise and very small objects
+            # Step 4: Segmentation and Contour Extraction
+            contours, _ = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+            # Step 5: Find and Keep Only the Largest Contour
+            min_area = 1000  
             filtered_contours = [cnt for cnt in contours if cv2.contourArea(cnt) > min_area]
 
-            if not filtered_contours:
-                return jsonify({'error': 'No valid leaf contour found'}), 400
+            results = []
 
-            # Select the largest contour
-            largest_contour = max(filtered_contours, key=cv2.contourArea)
+            # Step 6: Contour Refinement and Analysis
+            for i, contour in enumerate(filtered_contours):
+                # Approximate the contour
+                epsilon = 0.01 * cv2.arcLength(contour, True)
+                approx = cv2.approxPolyDP(contour, epsilon, True)
+                cv2.drawContours(image, [approx], -1, (0, 255, 0), 2)
 
-            # Step 7: Analyze the Largest Contour
-            epsilon = 0.01 * cv2.arcLength(largest_contour, True)
-            approx = cv2.approxPolyDP(largest_contour, epsilon, True)
-            cv2.drawContours(image, [approx], -1, (0, 255, 0), 2)
+                # Calculate area and perimeter
+                pixel_to_mm = 0.0265  # Conversion factor for pixels to cm
+                area = cv2.contourArea(contour) * (pixel_to_mm**2)  # Convert to cm²
+                perimeter = cv2.arcLength(contour, True) * pixel_to_mm  # Convert to cm
 
-            # Extract size and compute the estimated age
-            area = cv2.contourArea(largest_contour)
-            perimeter = cv2.arcLength(largest_contour, True)
-            growth_rate = 60  # Growth rate specific to Acer rubrum (example value)
-            age_days = area / growth_rate
-
-            # Add label to image
-            text = f"Acer rubrum"
-            cv2.putText(image, text, (approx[0][0][0], approx[0][0][1] - 10),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-
-            # Include the analysis result in the response
-            results = [{
-                'contour_id': 1,
-                'area': f"{area:.2f}",
-                'perimeter': f"{perimeter:.2f}",
-                'estimated_age': f"{age_days:.2f}"
-            }]
+                # Approximation of growth rate for Acer rubrum
+                growth_rate = 40  # Growth rate in mm²/day
+                estimated_age_days = area / growth_rate
+                results.append({
+                    'contour_id': i + 1,
+                    'area': f"{area:.2f}",
+                    'perimeter': f"{perimeter:.2f}",
+                    'estimated_age': f"{estimated_age_days:.2f}"
+                })    
             
             # Save processed images
             binary_filename = f'binary_{filename}'
             result_filename = f'result_{filename}'
             
-            cv2.imwrite(os.path.join(app.config['UPLOAD_FOLDER'], binary_filename), processed_image)
+            cv2.imwrite(os.path.join(app.config['UPLOAD_FOLDER'], binary_filename), binary)
             cv2.imwrite(os.path.join(app.config['UPLOAD_FOLDER'], result_filename), image)
             
             return jsonify({
