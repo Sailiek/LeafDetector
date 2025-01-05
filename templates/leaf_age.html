@@ -3,65 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Acer rubrum Leaf Age Detection</title>
+    <title>Leaf Age Detection - Leaf Detector</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Crimson+Text:wght@400;600&family=Playfair+Display:wght@400;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
-    <style>
-        .age-container {
-            max-width: 1200px;
-            margin: 20px auto;
-            padding: 30px;
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        }
-        
-        .image-section {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 20px;
-            margin-bottom: 30px;
-        }
-        
-        .image-preview {
-            text-align: center;
-        }
-        
-        .image-preview img {
-            max-width: 100%;
-            height: auto;
-            border-radius: 8px;
-            margin-top: 10px;
-        }
-        
-        .results-section {
-            margin-top: 30px;
-            padding: 20px;
-            background: #f8f9fa;
-            border-radius: 8px;
-        }
-        
-        .results-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 20px;
-        }
-        
-        .results-table th,
-        .results-table td {
-            padding: 12px;
-            border: 1px solid #dee2e6;
-            text-align: left;
-        }
-        
-        .results-table th {
-            background-color: #6c5ce7;
-            color: white;
-        }
-        
-        .results-table tr:nth-child(even) {
-            background-color: #f8f9fa;
-        }
-    </style>
 </head>
 <body>
     <div class="age-container">
