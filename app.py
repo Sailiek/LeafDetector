@@ -178,7 +178,7 @@ def plant_detection_page():
            
     return render_template('plant_detection.html')
 
-# Add this helper function if you don't already have it
+#Helper function to resize images
 def resize_image(image, target_size=(800, 600)):
     """Resize image while maintaining aspect ratio"""
     height, width = image.shape[:2]
@@ -194,6 +194,8 @@ def resize_image(image, target_size=(800, 600)):
         new_width = int(new_height * aspect)
     
     return cv2.resize(image, (new_width, new_height), interpolation=cv2.INTER_AREA)
+
+
 # Age Detection page
 @app.route('/leaf-age', methods=['GET', 'POST'])
 def leaf_age():
@@ -256,7 +258,7 @@ def leaf_age():
                     'area': f"{area:.2f}",
                     'perimeter': f"{perimeter:.2f}",
                     'estimated_age': f"{estimated_age_days:.2f}"
-                })    
+                })
             
             # Save processed images
             binary_filename = f'binary_{filename}'
